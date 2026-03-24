@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Змейка PRO v1.08</title>
+<style>
+body { margin:0; background:#0b0b0b; color:#fff; font-family:Arial; text-align:center; overflow:hidden; }
+#menu, #game-container, #leaderboard-menu, #skin-menu { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+#game-container, #leaderboard-menu, #skin-menu { display:none; position:relative; }
+canvas { background:#000; border:2px solid #333; border-radius:10px; margin-top:20px; }
+input, select, button { padding:6px 10px; border-radius:5px; border:none; margin:3px; cursor:pointer; }
+#creator { position: fixed; top: 5px; left: 10px; font-size:14px; color:white; }
+#version { position: fixed; top: 5px; right: 10px; font-size:14px; color:white; }
+#deviceInfo { position: fixed; bottom: 5px; left: 10px; font-size:12px; color:white; }
+#game-info { position:fixed; left:10px; top:50px; font-size:14px; color:white; text-align:left; }
+#leaderboard-list { max-height:400px; overflow-y:auto; width:350px; text-align:left; margin-top:10px; border:1px solid #444; padding:10px; border-radius:5px; background:#111; }
+#skin-options { display:flex; flex-direction:column; align-items:flex-start; margin-top:10px; border:1px solid #444; padding:10px; border-radius:5px; background:#111; }
+#admin-panel { border:1px solid #444; padding:10px; border-radius:5px; background:#111; position:fixed; right:10px; top:50%; transform:translateY(-50%); z-index:10; display:none; flex-direction:column; align-items:center; }
+#admin-input-container { position:fixed; bottom:10px; right:10px; display:flex; flex-direction:column; align-items:flex-end; }
+#admin-input-container input { width:100px; }
+</style>
+</head>
+<body>
+
+<!-- Меню -->
+<div id="menu">
+  <h1>🐍 Змейка PRO</h1>
+  <label>Ваш ник:</label><br>
+  <input id="nickname" placeholder="Введите ник"><br>
+  <label>Цвет змейки:</label><br>
+  <input type="color" id="snake-color" value="#00ffcc"><br>
+  <label>Язык:</label><br>
+  <select id="language">
+    <option value="ru">Русский</option>
+    <option value="uk">Українська</option>
+    <option value="en">English</option>
+    <option value="cn">中文</option>
+  </select><br>
+  <button id="start-btn">Старт</button>
+  <button onclick="showLeaderboard()">Рекорды</button>
+  <button onclick="showSkinMenu()">Скины</button>
+</div>
+
+<!-- Игровой экран -->
+<div id="game-container">
+  <canvas id="game" width="420" height="420"></canvas>
+  <div id="game-info">
+    <div>Размер яблока: <span id="appleSizeDisplay">18</span></div>
+    <div>Скорость змейки: <span id="speedDisplay">10</span></div>
+  </div>
+  <div>Очки: <span id="score">0</span></div>
+  <div>Рекорд: <span id="best">0</span></div>
+  <button onclick="togglePause()">Пауза (P)</button>
+  <button onclick="exitToMenu()">Выход в меню</button>
+</div>
+
+<!-- Меню рекордов -->
+<div id="leaderboard-menu">
+  <h2>Топ рекордов</h2>
+  <div style="display:flex; gap:10px; justify-content:center;">
+    <button onclick="showLeaderboardTime('day')">Топ дня</button>
+    <button onclick="showLeaderboardTime('week')">Топ недели</button>
+    <button onclick="showLeaderboardTime('month')">Топ месяца</button>
+    <button onclick="showLeaderboardTime('all')">Топ всего</button>
+  </div>
+  <div id="leaderboard-list"></div>
+  <button onclick="backToMenu()">← Назад</button>
+</div>
+
+<!-- Меню скинов -->
+<div id="skin-menu">
+  <h2>Выбор скина</h2>
+  <div id="skin-options">
+    <label>Цвет змейки: <input type="color" id="skin-color" value="#00ffcc"></label><br>
+    <label>Хвост: 
+      <select id="tail-select">
+        <option value="normal">Обычный</option>
+        <option value="long">Длинный</option>
+        <option value="short">Короткий</option>
+      </select>
+    </label><br>
+    <label>Глаза: 
+      <select id="eye-select">
+        <option value="normal">Обычные</option>
+        <option value="big">Большие</option>
+        <option value="small">Маленькие</option>
+      </select>
+    </label>
+  </div>
+  <button onclick="backToMenu()">← Назад</button>
+</div>
+
+<div id="creator">By. Drax</div>
+<div id="version">Версия: 1.02.1</div>
+<div id="deviceInfo">Загрузка данных...</div>
+
+<!-- Админ-панель -->
+<div id="admin-panel">
+  <h3>Админ-панель</h3>
+  <div>Накрутка очков:</div>
+  <div style="display:flex; gap:5px; flex-wrap:wrap;">
+    <button onclick="addScore(1)">+1</button>
+    <button onclick="addScore(5)">+5</button>
+    <button onclick="addScore(10)">+10</button>
+    <button onclick="addScore(100)">+100</button>
+  </div>
+  <div>Размер яблок:</div>
+  <button onclick="changeAppleSize(2)">+ Размер</button>
+  <button onclick="changeAppleSize(-2)">- Размер</button>
+  <div>Скорость змейки:</div>
+  <button onclick="changeSpeed(1)">+ Скорость</button>
+  <button onclick="changeSpeed(-1)">- Скорость</button>
+</div>
+
+<!-- Ввод админ-кода -->
+<div id="admin-input-container">
+  <input id="admin-code" placeholder="Код админа">
+  <button onclick="checkAdmin()">Войти</button>
+  <div id="admin-msg"></div>
+</div>
+
+<script>
+// --- Переменные ---
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const grid = 20;
+let snake, apple, score, nickname, best;
+let speed = 10;
+let snakeColor = '#00ffcc';
+let appleSize = grid-2;
+let paused = false;
+let lastTime = 0;
+let moveInterval = 0;
+
+// --- Рекорды ---
+function saveScore(){
+  let leaderboard = JSON.parse(localStorage.getItem('snake_leaderboard')||'[]');
+  const date = new Date();
+  let existing = leaderboard.find(e=>e.nick===nickname);
+  if(existing){
+    if(score>existing.score){
+      existing.score=score;
+      existing.date = date.toLocaleString();
+      existing.time = date.getTime();
+    }
+  } else {
+    leaderboard.push({nick:nickname, score, date:date.toLocaleString(), time:date.getTime()});
+  }
+  leaderboard.sort((a,b)=>b.score-a.score);
+  if(leaderboard.length>100) leaderboard.length=100;
+  localStorage.setItem('snake_leaderboard', JSON.stringify(leaderboard));
+}
+
+function showLeaderboard(){
+  document.getElementById('menu').style.display='none';
+  document.getElementById('leaderboard-menu').style.display='flex';
+  showLeaderboardTime('all');
+}
+
+function showLeaderboardTime(period){
+  const list = document.getElementById('leaderboard-list');
+  let leaderboard = JSON.parse(localStorage.getItem('snake_leaderboard')||'[]');
+  const now = Date.now();
+  leaderboard = leaderboard.filter(e=>{
+    if(period==='day') return now-e.time<24*60*60*1000;
+    if(period==='week') return now-e.time<7*24*60*60*1000;
+    if(period==='month') return now-e.time<30*24*60*60*1000;
+    return true;
+  });
+  leaderboard.sort((a,b)=>b.score-a.score);
+  list.innerHTML = leaderboard.map((e,i)=>`${i+1}. ${e.nick} - ${e.score} (${e.date})`).join('<br>');
+}
+
+function backToMenu(){
+  document.getElementById('menu').style.display='flex';
+  document.getElementById('leaderboard-menu').style.display='none';
+  document.getElementById('skin-menu').style.display='none';
+}
+
+// --- Скины ---
+function showSkinMenu(){
+  document.getElementById('menu').style.display='none';
+  document.getElementById('skin-menu').style.display='flex';
+  const colorPicker = document.getElementById('skin-color');
+  colorPicker.value = snakeColor;
+  colorPicker.oninput = ()=>snakeColor=colorPicker.value;
+}
+
+// --- Админ ---
+function checkAdmin(){
+  const code = document.getElementById('admin-code').value.trim();
+  const msg = document.getElementById('admin-msg');
+  const panel = document.getElementById('admin-panel');
+  if(code==='1234'){
+    msg.textContent='Поздравляем! Вы админ';
+    panel.style.display='flex';
+  } else {
+    msg.textContent='Неправильный код!';
+    panel.style.display='none';
+  }
+}
+
+function addScore(n){ score+=n; document.getElementById('score').textContent=score; }
+function changeAppleSize(n){ appleSize=Math.max(4, appleSize+n); document.getElementById('appleSizeDisplay').textContent=appleSize; }
+function changeSpeed(n){ speed=Math.min(Math.max(1, speed+n),20); document.getElementById('speedDisplay').textContent=speed; }
+
+// --- Игра ---
+document.getElementById('start-btn').onclick = ()=>{
+  nickname = document.getElementById('nickname').value.trim();
+  if(!nickname){
+    alert('Введите ник, чтобы начать игру!');
+    return;
+  }
+  snakeColor = document.getElementById('snake-color').value;
+  document.getElementById('menu').style.display='none';
+  document.getElementById('game-container').style.display='flex';
+  best = localStorage.getItem('snake_best_'+nickname)||0;
+  document.getElementById('best').textContent = best;
+  init();
+  requestAnimationFrame(loop);
+};
+
+function init(){
+  snake = {x:160,y:160,dx:grid,dy:0,cells:[],maxCells:4};
+  apple = {x:320,y:320};
+  score=0; paused=false;
+  document.getElementById('score').textContent=score;
+  document.getElementById('appleSizeDisplay').textContent=appleSize;
+  document.getElementById('speedDisplay').textContent=speed;
+}
+
+function togglePause(){ paused=!paused; }
+function getRandomInt(min,max){ return Math.floor(Math.random()*(max-min))+min; }
+
+function loop(timestamp){
+  requestAnimationFrame(loop);
+  if(paused) return;
+  if(!lastTime) lastTime = timestamp;
+  const delta = timestamp - lastTime;
+  moveInterval = 200 - (speed-1)*10;
+  if(delta < moveInterval) return;
+  lastTime = timestamp;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  snake.x += snake.dx;
+  snake.y += snake.dy;
+  if(snake.x<0||snake.x>=canvas.width||snake.y<0||snake.y>=canvas.height){ gameOver(); return; }
+
+  snake.cells.unshift({x:snake.x,y:snake.y});
+  if(snake.cells.length>snake.maxCells) snake.cells.pop();
+
+  ctx.fillStyle='red';
+  ctx.fillRect(apple.x,apple.y,appleSize,appleSize);
+
+  for(let i=0;i<snake.cells.length;i++){
+    const cell=snake.cells[i];
+    ctx.fillStyle=i===0?snakeColor:'#00aa88';
+    ctx.fillRect(cell.x,cell.y,grid-2,grid-2);
+
+    if(cell.x===apple.x && cell.y===apple.y){
+      snake.maxCells++; score++;
+      document.getElementById('score').textContent=score;
+      apple.x=getRandomInt(0,21)*grid;
+      apple.y=getRandomInt(0,21)*grid;
+    }
+
+    for(let j=i+1;j<snake.cells.length;j++){
+      if(cell.x===snake.cells[j].x && cell.y===snake.cells[j].y) gameOver();
+    }
+  }
+}
+
+function gameOver(){
+  paused=true;
+  if(score>best){ best=score; localStorage.setItem('snake_best_'+nickname,best); document.getElementById('best').textContent=best; }
+  saveScore();
+  alert(`Game Over! Ник: ${nickname}, Очки: ${score}`);
+  exitToMenu();
+}
+
+function exitToMenu(){
+  document.getElementById('game-container').style.display='none';
+  document.getElementById('menu').style.display='flex';
+}
+
+window.addEventListener('keydown', e=>{
+  const key=e.key.toLowerCase();
+  if(key==='a' && snake.dx===0){ snake.dx=-grid; snake.dy=0; }
+  else if(key==='w' && snake.dy===0){ snake.dy=-grid; snake.dx=0; }
+  else if(key==='d' && snake.dx===0){ snake.dx=grid; snake.dy=0; }
+  else if(key==='s' && snake.dy===0){ snake.dy=grid; snake.dx=0; }
+  if(key==='p') togglePause();
+});
+
+// --- Устройство ---
+async function loadDeviceInfo(){
+  const device=navigator.userAgent;
+  try{
+    const res=await fetch('https://ipapi.co/json/');
+    const data=await res.json();
+    document.getElementById('deviceInfo').innerText=`Город: ${data.city} | IP: ${data.ip} | Устройство: ${device}`;
+  }catch{ document.getElementById('deviceInfo').innerText=`Устройство: ${device}`; }
+}
+loadDeviceInfo();
+</script>
+</body>
+</html>
